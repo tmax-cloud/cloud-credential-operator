@@ -1,0 +1,11 @@
+domain: tmax.io
+layout: go.kubebuilder.io/v2
+projectName: cloud-credential-operator
+repo: github.com/tmax-cloud/cloud-credential-operator
+resources:
+- group: credentials
+  kind: CloudCredential
+  version: v1alpha1
+version: 3-alpha
+plugins:
+  go.sdk.operatorframework.io/v2-alpha: {}
