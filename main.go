@@ -75,6 +75,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "CloudCredential")
 		os.Exit(1)
 	}
+	if err = (&controllers.BillngReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("Billng"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Billng")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")

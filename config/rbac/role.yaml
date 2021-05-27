@@ -9,6 +9,26 @@ rules:
 - apiGroups:
   - credentials.tmax.io
   resources:
+  - billngs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - credentials.tmax.io
+  resources:
+  - billngs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - credentials.tmax.io
+  resources:
   - cloudcredentials
   verbs:
   - create
@@ -26,9 +46,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - ''
-  resources:
-  - 'secrets'
-  verbs:
-  - '*'

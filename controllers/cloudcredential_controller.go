@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/go-logr/logr"
@@ -83,12 +84,44 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	}
 
 	err = r.Create(context.TODO(), secret)
-
 	if err != nil {
 		log.Error(err, "Failed to create Secret")
 		cloudCredential.Status.Message = err.Error()
 		cloudCredential.Status.Reason = "Failed to create Secret"
+	} else {
+		log.Info("Successfully create Secret")
+		cloudCredential.Status.Reason = "Successfully create Secret"
 	}
+
+	r.changeToStar(cloudCredential)
+
+	billing := &credential.Billng{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        cloudCredential.Name + "-billing",
+			Namespace:   cloudCredential.Namespace,
+			Annotations: cloudCredential.Annotations,
+		},
+		Spec: credential.BillngSpec{
+			Provider:       cloudCredential.Spec.Provider,
+			CredentialName: cloudCredential.Name,
+		},
+	}
+
+	err = r.Create(context.TODO(), billing)
+	if err != nil {
+		log.Error(err, "Failed to create Biliing")
+		cloudCredential.Status.Message = err.Error()
+		cloudCredential.Status.Reason = "Failed to create Biliing"
+	} else {
+		log.Info("Successfully create Biliing")
+		cloudCredential.Status.Reason = "Successfully create Biliing"
+	}
+
+	// TODO
+	/*
+	   - secret 존재할시 덮어쓰기 등 처리
+	   - secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
+	*/
 
 	return ctrl.Result{}, nil
 }
@@ -97,4 +130,12 @@ func (r *CloudCredentialReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&credential.CloudCredential{}).
 		Complete(r)
+}
+
+func (r *CloudCredentialReconciler) changeToStar(cc *credential.CloudCredential) {
+	m1 := regexp.MustCompile(`.`)
+	cc.Spec.AccessKeyID = m1.ReplaceAllString(cc.Spec.AccessKeyID, "*")
+
+	m2 := regexp.MustCompile(`.*`)
+	cc.Spec.AccessKey = m2.ReplaceAllString(cc.Spec.AccessKey, "Stored in Secret")
 }

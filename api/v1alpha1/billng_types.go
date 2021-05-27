@@ -20,17 +20,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CloudCredentialSpec defines the desired state of CloudCredential
-type CloudCredentialSpec struct {
+// BillngSpec defines the desired state of Billng
+type BillngSpec struct {
 	Provider    string `json:"provider"`
-	AccessKeyID string `json:"accesskeyid"`
-	AccessKey   string `json:"accesskey"`
-
-	Region string `json:"region,omitempty"`
+	CredentialName string `json:"credentialname"`
 }
 
-// CloudCredentialStatus defines the observed state of CloudCredential
-type CloudCredentialStatus struct {
+// BillngStatus defines the observed state of Billng
+type BillngStatus struct {
 	// Message shows log when the status changed in last
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 	// Reason shows why the status changed in last
@@ -39,27 +36,27 @@ type CloudCredentialStatus struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
 
-// CloudCredential is the Schema for the cloudcredentials API
-type CloudCredential struct {
+// Billng is the Schema for the billngs API
+type Billng struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   CloudCredentialSpec   `json:"spec,omitempty"`
-	Status CloudCredentialStatus `json:"status,omitempty"`
+	Spec   BillngSpec   `json:"spec,omitempty"`
+	Status BillngStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+//+kubebuilder:object:root=true
 
-// CloudCredentialList contains a list of CloudCredential
-type CloudCredentialList struct {
+// BillngList contains a list of Billng
+type BillngList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CloudCredential `json:"items"`
+	Items           []Billng `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&CloudCredential{}, &CloudCredentialList{})
+	SchemeBuilder.Register(&Billng{}, &BillngList{})
 }
