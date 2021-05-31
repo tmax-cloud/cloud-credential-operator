@@ -1,5 +1,5 @@
 # Adds namespace to all resources.
-namespace: cloud-credential-operator-system
+namespace: hypercloud5-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named

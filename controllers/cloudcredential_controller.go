@@ -79,7 +79,8 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	}
 
 	r.createSecret(cloudCredential, data)
-	r.createRB(cloudCredential)
+	r.createRole(cloudCredential)
+	r.createRoleBinding(cloudCredential)
 	r.changeToStar(cloudCredential)
 
 	// TODO
@@ -135,7 +136,52 @@ func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential,
 	}
 }
 
-func (r *CloudCredentialReconciler) createRB(cc *credential.CloudCredential) {
+func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) {
+	log := r.Log
+	log.Info("Create Role For CloudCredential owner Start")
+	roleFound := &rbacApi.Role{}
+
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-owner", Namespace: cc.Namespace}, roleFound); err != nil && errors.IsNotFound(err) {
+		roleForCCOwner := &rbacApi.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cc.Name + "-owner",
+				Namespace:   cc.Namespace,
+				Labels:      cc.Labels,
+				Annotations: cc.Annotations,
+			},
+			Rules: []rbacApi.PolicyRule{
+				{
+					APIGroups: []string{
+						RBAC_API_GROUP,
+					},
+					Resources: []string{
+						"cloudcredential",
+					},
+					ResourceNames: []string{
+						cc.Name,
+					},
+					Verbs: []string{
+						"get",
+						"update",
+						"patch",
+						"delete",
+					},
+				},
+			},
+		}
+
+		if err := r.Create(context.TODO(), roleForCCOwner); err != nil && errors.IsNotFound(err) {
+			log.Info("Role for CloudCredential [ " + cc.Name + " ] Already Exists")
+		} else {
+			log.Info("Create Role [ " + cc.Name + "-owner ] Success")
+		}
+
+	} else {
+		log.Info("Roleb for CloudCredential [ " + cc.Name + " ] Already Exists")
+	}
+}
+
+func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCredential) {
 	log := r.Log
 	log.Info("Create Rolebinding For CloudCredential owner Start")
 	rbFound := &rbacApi.RoleBinding{}
@@ -156,16 +202,16 @@ func (r *CloudCredentialReconciler) createRB(cc *credential.CloudCredential) {
 				},
 			},
 			RoleRef: rbacApi.RoleRef{ // 실제 생성해줘야함
-				Kind:     "ClusterRole",
+				Kind:     "Role",
 				APIGroup: RBAC_API_GROUP,
-				Name:     "cloudcredential-owner",
+				Name:     cc.Name + "-owner",
 			},
 		}
 
 		if err := r.Create(context.TODO(), rbForCCOwner); err != nil && errors.IsNotFound(err) {
 			log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
 		} else {
-			log.Info("Create RoleBinding [ " + cc.Name + " ] Success")
+			log.Info("Create RoleBinding [ " + cc.Name + "-owner ] Success")
 		}
 
 	} else {
