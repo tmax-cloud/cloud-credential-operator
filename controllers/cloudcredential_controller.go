@@ -18,17 +18,24 @@ package controllers
 
 import (
 	"context"
+	"regexp"
 	"strings"
 
 	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
+	rbacApi "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	credential "github.com/tmax-cloud/cloud-credential-operator/api/v1alpha1"
+)
+
+const (
+	RBAC_API_GROUP = "rbac.authorization.k8s.io"
 )
 
 // CloudCredentialReconciler reconciles a CloudCredential object
@@ -71,24 +78,18 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		data["config"] = "[default]\n" + "region = " + region + "\n" + "output = json" + "\n"
 	}
 
-	secret := &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:        cloudCredential.Name,
-			Namespace:   cloudCredential.Namespace,
-			Annotations: cloudCredential.Annotations,
-		},
-		//Immutable: false,
-		Type:       v1.SecretTypeOpaque,
-		StringData: data,
-	}
+	r.createSecret(cloudCredential, data)
+	r.createRB(cloudCredential)
+	r.changeToStar(cloudCredential)
 
-	err = r.Create(context.TODO(), secret)
+	// TODO
+	/*
+	   - secret 존재할시 덮어쓰기 등 처리
+	   - secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
 
-	if err != nil {
-		log.Error(err, "Failed to create Secret")
-		cloudCredential.Status.Message = err.Error()
-		cloudCredential.Status.Reason = "Failed to create Secret"
-	}
+	   - secret에 대한 권한 Role을 사전생성
+	   - owner annotaiong 달아줘야함
+	*/
 
 	return ctrl.Result{}, nil
 }
@@ -97,4 +98,77 @@ func (r *CloudCredentialReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&credential.CloudCredential{}).
 		Complete(r)
+}
+
+func (r *CloudCredentialReconciler) changeToStar(cc *credential.CloudCredential) {
+	m1 := regexp.MustCompile(`.`)
+	cc.Spec.AccessKeyID = m1.ReplaceAllString(cc.Spec.AccessKeyID, "*")
+
+	m2 := regexp.MustCompile(`.*`)
+	cc.Spec.AccessKey = m2.ReplaceAllString(cc.Spec.AccessKey, "Stored in Secret")
+}
+
+func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential, data map[string]string) {
+	log := r.Log
+	log.Info("Create Secret For CloudCredential owner Start")
+	secretFound := &v1.Secret{}
+
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential", Namespace: cc.Namespace}, secretFound); err != nil && errors.IsNotFound(err) {
+		ccSecret := &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cc.Name + "-credential",
+				Namespace:   cc.Namespace,
+				Annotations: cc.Annotations,
+			},
+			//Immutable: false,
+			Type:       v1.SecretTypeOpaque,
+			StringData: data,
+		}
+
+		if err := r.Create(context.TODO(), ccSecret); err != nil && errors.IsNotFound(err) {
+			log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+		} else {
+			log.Info("Successfully create Secret")
+		}
+	} else {
+		log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+	}
+}
+
+func (r *CloudCredentialReconciler) createRB(cc *credential.CloudCredential) {
+	log := r.Log
+	log.Info("Create Rolebinding For CloudCredential owner Start")
+	rbFound := &rbacApi.RoleBinding{}
+
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-owner", Namespace: cc.Namespace}, rbFound); err != nil && errors.IsNotFound(err) {
+		rbForCCOwner := &rbacApi.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cc.Name + "-owner",
+				Namespace:   cc.Namespace,
+				Labels:      cc.Labels,
+				Annotations: cc.Annotations,
+			},
+			Subjects: []rbacApi.Subject{
+				{
+					Kind:     "User",
+					APIGroup: RBAC_API_GROUP,
+					Name:     cc.Annotations["owner"],
+				},
+			},
+			RoleRef: rbacApi.RoleRef{ // 실제 생성해줘야함
+				Kind:     "ClusterRole",
+				APIGroup: RBAC_API_GROUP,
+				Name:     "cloudcredential-owner",
+			},
+		}
+
+		if err := r.Create(context.TODO(), rbForCCOwner); err != nil && errors.IsNotFound(err) {
+			log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+		} else {
+			log.Info("Create RoleBinding [ " + cc.Name + " ] Success")
+		}
+
+	} else {
+		log.Info("Rolebinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+	}
 }
