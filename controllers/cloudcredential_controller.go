@@ -94,12 +94,13 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	   - secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
 	   - secret에 대한 권한 Role을 사전생성
 	   - owner annotation 달아줘야함
+	   - status 만들기
 	*/
 	// BUG
 	/*
 		- rolebinding 안 생김
-		- secret 안에 두개의 파일 분리해서 마운트해야함..? (keyPath)
 		- role의 resource가 이상하게 됨
+		- *** 처리 안됨
 	*/
 
 	return ctrl.Result{}, nil
