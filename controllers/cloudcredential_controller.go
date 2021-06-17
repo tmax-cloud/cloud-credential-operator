@@ -22,7 +22,8 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	v1 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacApi "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,8 @@ import (
 )
 
 const (
-	RBAC_API_GROUP = "rbac.authorization.k8s.io"
+	RBAC_API_GROUP      = "rbac.authorization.k8s.io"
+	AWS_CREDENTIAL_PATH = "/root/.aws"
 )
 
 // CloudCredentialReconciler reconciles a CloudCredential object
@@ -81,15 +83,23 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	r.createSecret(cloudCredential, data)
 	r.createRole(cloudCredential)
 	r.createRoleBinding(cloudCredential)
+	r.createDeployment(cloudCredential)
+	//r.createService(cloudCredential)
 	r.changeToStar(cloudCredential)
 
 	// TODO
 	/*
+	   - service 생성
 	   - secret 존재할시 덮어쓰기 등 처리
 	   - secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
-
 	   - secret에 대한 권한 Role을 사전생성
-	   - owner annotaiong 달아줘야함
+	   - owner annotation 달아줘야함
+	*/
+	// BUG
+	/*
+		- rolebinding 안 생김
+		- secret 안에 두개의 파일 분리해서 마운트해야함..? (keyPath)
+		- role의 resource가 이상하게 됨
 	*/
 
 	return ctrl.Result{}, nil
@@ -111,18 +121,18 @@ func (r *CloudCredentialReconciler) changeToStar(cc *credential.CloudCredential)
 
 func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential, data map[string]string) {
 	log := r.Log
-	log.Info("Create Secret For CloudCredential owner Start")
-	secretFound := &v1.Secret{}
+	log.Info("Create Secret For " + cc.Name + " owner Start")
+	secretFound := &corev1.Secret{}
 
 	if err := r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential", Namespace: cc.Namespace}, secretFound); err != nil && errors.IsNotFound(err) {
-		ccSecret := &v1.Secret{
+		ccSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cc.Name + "-credential",
 				Namespace:   cc.Namespace,
 				Annotations: cc.Annotations,
 			},
 			//Immutable: false,
-			Type:       v1.SecretTypeOpaque,
+			Type:       corev1.SecretTypeOpaque,
 			StringData: data,
 		}
 
@@ -138,11 +148,11 @@ func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential,
 
 func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) {
 	log := r.Log
-	log.Info("Create Role For CloudCredential owner Start")
+	log.Info("Create Role For " + cc.Name + " owner Start")
 	roleFound := &rbacApi.Role{}
 
 	if err := r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-owner", Namespace: cc.Namespace}, roleFound); err != nil && errors.IsNotFound(err) {
-		roleForCCOwner := &rbacApi.Role{
+		ccRole := &rbacApi.Role{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cc.Name + "-owner",
 				Namespace:   cc.Namespace,
@@ -170,7 +180,7 @@ func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) {
 			},
 		}
 
-		if err := r.Create(context.TODO(), roleForCCOwner); err != nil && errors.IsNotFound(err) {
+		if err := r.Create(context.TODO(), ccRole); err != nil && errors.IsNotFound(err) {
 			log.Info("Role for CloudCredential [ " + cc.Name + " ] Already Exists")
 		} else {
 			log.Info("Create Role [ " + cc.Name + "-owner ] Success")
@@ -183,11 +193,11 @@ func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) {
 
 func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCredential) {
 	log := r.Log
-	log.Info("Create Rolebinding For CloudCredential owner Start")
+	log.Info("Create Rolebinding For " + cc.Name + " owner Start")
 	rbFound := &rbacApi.RoleBinding{}
 
 	if err := r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-owner", Namespace: cc.Namespace}, rbFound); err != nil && errors.IsNotFound(err) {
-		rbForCCOwner := &rbacApi.RoleBinding{
+		ccRoleBinding := &rbacApi.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cc.Name + "-owner",
 				Namespace:   cc.Namespace,
@@ -201,14 +211,14 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 					Name:     cc.Annotations["owner"],
 				},
 			},
-			RoleRef: rbacApi.RoleRef{ // 실제 생성해줘야함
+			RoleRef: rbacApi.RoleRef{
 				Kind:     "Role",
 				APIGroup: RBAC_API_GROUP,
 				Name:     cc.Name + "-owner",
 			},
 		}
 
-		if err := r.Create(context.TODO(), rbForCCOwner); err != nil && errors.IsNotFound(err) {
+		if err := r.Create(context.TODO(), ccRoleBinding); err != nil && errors.IsNotFound(err) {
 			log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
 		} else {
 			log.Info("Create RoleBinding [ " + cc.Name + "-owner ] Success")
@@ -218,3 +228,77 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 		log.Info("Rolebinding for CloudCredential [ " + cc.Name + " ] Already Exists")
 	}
 }
+
+func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredential) {
+	log := r.Log
+	log.Info("Create Deployment For " + cc.Name + " owner Start")
+	deployFound := &appsv1.Deployment{}
+
+	if err := r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential-server", Namespace: cc.Namespace}, deployFound); err != nil && errors.IsNotFound(err) {
+		ccDeployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cc.Name + "-credential-server",
+				Namespace:   cc.Namespace,
+				Labels:      cc.Labels,
+				Annotations: cc.Annotations,
+			},
+			Spec: appsv1.DeploymentSpec{
+				Replicas: int32Ptr(1),
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"hypercloud": cc.Name + "-credential-server",
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"hypercloud": cc.Name + "-credential-server",
+						},
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "credential-server",
+								Image: "192.168.9.12:5000/cc-light-api-server:v0.0.0", // should be modified
+								Ports: []corev1.ContainerPort{
+									{
+										Name:          "http",
+										Protocol:      corev1.ProtocolTCP,
+										ContainerPort: 80,
+									},
+								},
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "credential",
+										MountPath: AWS_CREDENTIAL_PATH,
+									},
+								},
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "credential",
+								VolumeSource: corev1.VolumeSource{
+									Secret: &corev1.SecretVolumeSource{
+										SecretName: cc.Name + "-credential",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		if err := r.Create(context.TODO(), ccDeployment); err != nil && errors.IsNotFound(err) {
+			log.Info("Deployment for CloudCredential [ " + cc.Name + " ] Already Exists")
+		} else {
+			log.Info("Create Deployment [ " + cc.Name + "-credential-server ] Success")
+		}
+
+	} else {
+		log.Info("Deployment for CloudCredential [ " + cc.Name + " ] Already Exists")
+	}
+}
+
+func int32Ptr(i int32) *int32 { return &i }
