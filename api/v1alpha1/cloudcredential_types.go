@@ -23,13 +23,19 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+const (
+	CloudCredentialStatusTypeAwaiting = "Awaiting"
+	CloudCredentialStatusTypeCreated  = "Created"
+	CloudCredentialStatusTypeError    = "Error"
+	CloudCredentialStatusTypeDeleted  = "CloudCredential Deleted"
+)
+
 // CloudCredentialSpec defines the desired state of CloudCredential
 type CloudCredentialSpec struct {
 	Provider    string `json:"provider"`
 	AccessKeyID string `json:"accesskeyid"`
 	AccessKey   string `json:"accesskey"`
-
-	Region string `json:"region,omitempty"`
+	Region      string `json:"region,omitempty"`
 }
 
 // CloudCredentialStatus defines the observed state of CloudCredential
@@ -40,6 +46,9 @@ type CloudCredentialStatus struct {
 	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
 	// LastTransitionTime shows the time when the status changed in last
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
+	// +kubebuilder:validation:Enum=Awaiting;Created;Error;CloudCredential Deleted;
+	// Status shows the present status of the CloudCredential
+	Status string `json:"status,omitempty" protobuf:"bytes,4,opt,name=status"`
 }
 
 // +kubebuilder:object:root=true
