@@ -96,7 +96,7 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		r.patchHelper.Patch(context.TODO(), cloudCredential)
 	}()
 
-	log.Info("Resource Name [ " + cloudCredential.Name + "]")
+	log.Info("Resource Name [ " + cloudCredential.Name + " ]")
 	log.Info("Resource Status : " + cloudCredential.Status.Status)
 
 	switch cloudCredential.Status.Status {
@@ -108,28 +108,28 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		}
 
 		ccList := &credential.CloudCredentialList{}
-		if err := r.List(context.TODO(), ccList); err != nil {
+		if err = r.List(context.TODO(), ccList); err != nil {
 			log.Error(err, "Failed to get CloudCredential List")
 			panic(err)
 		}
 
 		// Check Duplicated Name
-		flag := false
+		duplicated := false
 		for _, cc := range ccList.Items {
 			if cc.Status.Status == credential.CloudCredentialStatusTypeAwaiting && cc.Name == cloudCredential.Name {
-				flag = true
+				duplicated = true
 				break
 			}
 		}
 
-		if err != nil && errors.IsNotFound(err) && !flag {
-			log.Info("Namespace [ " + cloudCredential.Name + " ] Not found.")
+		if !duplicated {
+			log.Info("CloudCredential [ " + cloudCredential.Name + " ] Not found.")
 			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeCreated
 			cloudCredential.Status.Reason = "Please Wait for Creating required resources"
 		} else {
-			log.Info("Namespace [ " + cloudCredential.Name + " ] Already Exists.")
+			log.Info("CloudCredential [ " + cloudCredential.Name + " ] Already Exists.")
 			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
-			cloudCredential.Status.Reason = "Duplicated NameSpaceName"
+			cloudCredential.Status.Reason = "Duplicated Reosurce Name"
 		}
 	//case credential.CloudCredentialStatusTypeAwaiting:
 	//case credential.CloudCredentialStatusTypeError:
@@ -177,6 +177,7 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		}
 		//r.createService(cloudCredential); err != nil && !errors.IsNotFound(err) {}
 		r.changeToStar(cloudCredential)
+		cloudCredential.Status.Reason = "Successfully Created"
 	}
 
 	return ctrl.Result{}, nil

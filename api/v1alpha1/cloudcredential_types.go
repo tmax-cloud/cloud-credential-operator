@@ -53,7 +53,9 @@ type CloudCredentialStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.status`
+// +kubebuilder:printcolumn:name="Reason",type=string,JSONPath=`.status.reason`
 // CloudCredential is the Schema for the cloudcredentials API
 type CloudCredential struct {
 	metav1.TypeMeta   `json:",inline"`
