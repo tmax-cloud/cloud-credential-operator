@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,8 +45,9 @@ const (
 // CloudCredentialReconciler reconciles a CloudCredential object
 type CloudCredentialReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log         logr.Logger
+	Scheme      *runtime.Scheme
+	patchHelper *patch.Helper
 }
 
 // +kubebuilder:rbac:groups=credentials.tmax.io,resources=cloudcredentials,verbs=get;list;watch;create;update;patch;delete
@@ -67,8 +69,16 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		return ctrl.Result{}, err
 	}
 
-	provider := cloudCredential.Spec.Provider
+	if helper, err := patch.NewHelper(cloudCredential, r.Client); err != nil {
+		return ctrl.Result{}, err
+	} else {
+		r.patchHelper = helper
+	}
+	defer func() {
+		r.patchHelper.Patch(context.TODO(), cloudCredential)
+	}()
 
+	provider := cloudCredential.Spec.Provider
 	accessKeyID := cloudCredential.Spec.AccessKeyID
 	accessKey := cloudCredential.Spec.AccessKey
 	region := cloudCredential.Spec.Region
@@ -90,17 +100,19 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 
 	// TODO
 	/*
-	   - service 생성
-	   - secret 존재할시 덮어쓰기 등 처리
-	   - secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
-	   - secret에 대한 권한 Role을 사전생성
-	   - owner annotation 달아줘야함
-	   - status 만들기
+			1. 모든 리소스 정상 생성
+			2. status 만들어서 관리?
+			2. API 서버에서 특정 경량 api 서버로 날리는 로직 (함수) 짜기
+			3. 테스트
+		   	- service 생성
+		   	- secret 존재할시 덮어쓰기 등 처리
+		   	- secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
+		   	- secret에 대한 권한 Role을 사전생성
+		   	- owner annotation 달아줘야함
 	*/
 	// BUG
 	/*
-		- *** 처리 안됨
-	*/
+	 */
 
 	return ctrl.Result{}, nil
 }
