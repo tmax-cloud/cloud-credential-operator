@@ -37,6 +37,7 @@ import (
 
 const (
 	RBAC_API_GROUP      = "rbac.authorization.k8s.io"
+	TMAX_API_GROUP      = "credentials.tmax.io"
 	AWS_CREDENTIAL_PATH = "/root/.aws"
 )
 
@@ -98,8 +99,6 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	*/
 	// BUG
 	/*
-		- rolebinding 안 생김
-		- role의 resource가 이상하게 됨
 		- *** 처리 안됨
 	*/
 
@@ -163,7 +162,7 @@ func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) {
 			Rules: []rbacApi.PolicyRule{
 				{
 					APIGroups: []string{
-						RBAC_API_GROUP,
+						TMAX_API_GROUP,
 					},
 					Resources: []string{
 						"cloudcredential",
@@ -183,12 +182,13 @@ func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) {
 
 		if err := r.Create(context.TODO(), ccRole); err != nil && errors.IsNotFound(err) {
 			log.Info("Role for CloudCredential [ " + cc.Name + " ] Already Exists")
+		} else if err != nil {
+			log.Error(err, "Failed to create Role")
 		} else {
 			log.Info("Create Role [ " + cc.Name + "-owner ] Success")
 		}
-
 	} else {
-		log.Info("Roleb for CloudCredential [ " + cc.Name + " ] Already Exists")
+		log.Info("Role for CloudCredential [ " + cc.Name + " ] Already Exists")
 	}
 }
 
@@ -207,9 +207,9 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 			},
 			Subjects: []rbacApi.Subject{
 				{
+					Name:     cc.Annotations["owner"],
 					Kind:     "User",
 					APIGroup: RBAC_API_GROUP,
-					Name:     cc.Annotations["owner"],
 				},
 			},
 			RoleRef: rbacApi.RoleRef{
@@ -221,6 +221,8 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 
 		if err := r.Create(context.TODO(), ccRoleBinding); err != nil && errors.IsNotFound(err) {
 			log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+		} else if err != nil {
+			log.Error(err, "Failed to create Rolebinding")
 		} else {
 			log.Info("Create RoleBinding [ " + cc.Name + "-owner ] Success")
 		}
