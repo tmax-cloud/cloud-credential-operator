@@ -39,15 +39,14 @@ import (
 // TODO
 /*
 		1. 모든 리소스 정상 생성
-		2. status 만들어서 관리?
 		2. API 서버에서 특정 경량 api 서버로 날리는 로직 (함수) 짜기
 		3. 테스트
-	   	- service 생성
+	   	- 삭제 로직
+		- provider별 생성 로직
 	   	- secret 존재할시 덮어쓰기 등 처리
 	   	- secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
 	   	- secret에 대한 권한 Role을 사전생성
 	   	- owner annotation 달아줘야함
-		- provider별 이미지를 const로 선언하기
 */
 // BUG
 /*
@@ -124,16 +123,16 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 
 		if !duplicated {
 			log.Info("CloudCredential [ " + cloudCredential.Name + " ] Not found.")
-			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeCreated
+			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeAwaiting
 			cloudCredential.Status.Reason = "Please Wait for Creating required resources"
 		} else {
 			log.Info("CloudCredential [ " + cloudCredential.Name + " ] Already Exists.")
 			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
 			cloudCredential.Status.Reason = "Duplicated Reosurce Name"
 		}
-	//case credential.CloudCredentialStatusTypeAwaiting:
+	//case credential.CloudCredentialStatusTypeCreated:
 	//case credential.CloudCredentialStatusTypeError:
-	case credential.CloudCredentialStatusTypeCreated:
+	case credential.CloudCredentialStatusTypeAwaiting:
 		provider := cloudCredential.Spec.Provider
 		accessKeyID := cloudCredential.Spec.AccessKeyID
 		accessKey := cloudCredential.Spec.AccessKey
@@ -175,8 +174,15 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 			cloudCredential.Status.Reason = "Failed to create Deployment"
 			return ctrl.Result{}, err
 		}
-		//r.createService(cloudCredential); err != nil && !errors.IsNotFound(err) {}
+		if err := r.createService(cloudCredential); err != nil && !errors.IsNotFound(err) {
+			log.Error(err, "Failed to create Service")
+			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
+			cloudCredential.Status.Message = err.Error()
+			cloudCredential.Status.Reason = "Failed to create Service"
+			return ctrl.Result{}, err
+		}
 		r.changeToStar(cloudCredential)
+		cloudCredential.Status.Status = credential.CloudCredentialStatusTypeCreated
 		cloudCredential.Status.Reason = "Successfully Created"
 	}
 
@@ -390,4 +396,41 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 	return err
 }
 
+func (r *CloudCredentialReconciler) createService(cc *credential.CloudCredential) error {
+	var err error
+	log := r.Log
+	log.Info("Create Service For " + cc.Name + " owner Start")
+	serviceFound := &corev1.Service{}
+
+	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential-server-service", Namespace: cc.Namespace}, serviceFound); err != nil && errors.IsNotFound(err) {
+		ccService := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        cc.Name + "-credential-server-service",
+				Namespace:   cc.Namespace,
+				Labels:      cc.Labels,
+				Annotations: cc.Annotations,
+			},
+			Spec: corev1.ServiceSpec{
+				Type:      corev1.ServiceTypeClusterIP,
+				ClusterIP: "None",
+				Selector: map[string]string{
+					"hypercloud": cc.Name + "-credential-server",
+				},
+				Ports: []corev1.ServicePort{
+					{
+						Port: 80,
+					},
+				},
+			},
+		}
+		if err = r.Create(context.TODO(), ccService); err != nil && errors.IsNotFound(err) {
+			log.Info("Service for CloudCredential [ " + cc.Name + " ] Already Exists")
+		} else {
+			log.Info("Create Service [ " + cc.Name + "-credential-server-service ] Success")
+		}
+	} else {
+		log.Info("Service for CloudCredential [ " + cc.Name + " ] Already Exists")
+	}
+	return err
+}
 func int32Ptr(i int32) *int32 { return &i }
