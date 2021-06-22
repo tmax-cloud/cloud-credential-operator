@@ -43,6 +43,8 @@ import (
 		3. 테스트
 	   	- 삭제 로직
 		- provider별 생성 로직
+		- 경량 서버 직접 접근 인가 로직
+		- Spec을 array로 받아서 한 유저가 여러 계정을 한번에 등록 할 수 있도록
 	   	- secret 존재할시 덮어쓰기 등 처리
 	   	- secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
 	   	- secret에 대한 권한 Role을 사전생성
