@@ -32,7 +32,7 @@ const (
 
 // CloudCredentialSpec defines the desired state of CloudCredential
 type CloudCredentialSpec struct {
-	Provider    string `json:"provider"`
+	Profile     string `json:"profile"`
 	AccessKeyID string `json:"accesskeyid"`
 	AccessKey   string `json:"accesskey"`
 	Region      string `json:"region,omitempty"`
@@ -61,8 +61,9 @@ type CloudCredential struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   CloudCredentialSpec   `json:"spec,omitempty"`
-	Status CloudCredentialStatus `json:"status,omitempty"`
+	Provider string                `json:"provider"`
+	Spec     []CloudCredentialSpec `json:"spec,omitempty"`
+	Status   CloudCredentialStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true

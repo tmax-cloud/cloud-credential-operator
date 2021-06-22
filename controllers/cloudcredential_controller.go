@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"regexp"
-	"strings"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -42,9 +41,8 @@ import (
 		2. API 서버에서 특정 경량 api 서버로 날리는 로직 (함수) 짜기
 		3. 테스트
 	   	- 삭제 로직
-		- provider별 생성 로직
+		- validation 웹훅 (아니면 그냥 required 필드로 막던가)
 		- 경량 서버 직접 접근 인가 로직
-		- Spec을 array로 받아서 한 유저가 여러 계정을 한번에 등록 할 수 있도록
 	   	- secret 존재할시 덮어쓰기 등 처리
 	   	- secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
 	   	- secret에 대한 권한 Role을 사전생성
@@ -55,10 +53,14 @@ import (
  */
 
 const (
-	RBAC_API_GROUP      = "rbac.authorization.k8s.io"
-	TMAX_API_GROUP      = "credentials.tmax.io"
+	RBAC_API_GROUP = "rbac.authorization.k8s.io"
+	TMAX_API_GROUP = "credentials.tmax.io"
+
 	AWS_CREDENTIAL_PATH = "/root/.aws"
-	AWS_IMAGE           = "192.168.9.12:5000/cc-light-api-server:v0.0.0" // should be modified
+	AWS_IMAGE           = "192.168.9.12:5000/cc-light-api-server:v0.0.0" // modify later
+
+	GCP_CREDENTIAL_PATH = "/root/"        // modify later
+	GCP_IMAGE           = "example-image" // modify later
 )
 
 // CloudCredentialReconciler reconciles a CloudCredential object
@@ -135,17 +137,21 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	//case credential.CloudCredentialStatusTypeCreated:
 	//case credential.CloudCredentialStatusTypeError:
 	case credential.CloudCredentialStatusTypeAwaiting:
-		provider := cloudCredential.Spec.Provider
-		accessKeyID := cloudCredential.Spec.AccessKeyID
-		accessKey := cloudCredential.Spec.AccessKey
-		region := cloudCredential.Spec.Region
-
 		var data map[string]string
 		data = make(map[string]string)
 
-		if strings.EqualFold(provider, "aws") {
-			data["credentials"] = "[default]\n" + "aws_access_key_id = " + accessKeyID + "\n" + "aws_secret_access_key = " + accessKey + "\n"
-			data["config"] = "[default]\n" + "region = " + region + "\n" + "output = json" + "\n"
+		switch cloudCredential.Provider {
+		case "aws", "AWS":
+			for _, spec := range cloudCredential.Spec {
+				profile := spec.Profile
+				accessKeyID := spec.AccessKeyID
+				accessKey := spec.AccessKey
+				region := spec.Region
+
+				data["credentials"] += "[" + profile + "]\n" + "aws_access_key_id = " + accessKeyID + "\n" + "aws_secret_access_key = " + accessKey + "\n"
+				data["config"] += "[" + profile + "]\n" + "region = " + region + "\n" + "output = json" + "\n"
+			}
+		case "gcp", "GCP":
 		}
 
 		if err := r.createSecret(cloudCredential, data); err != nil && !errors.IsNotFound(err) {
@@ -199,10 +205,12 @@ func (r *CloudCredentialReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *CloudCredentialReconciler) changeToStar(cc *credential.CloudCredential) {
 	m1 := regexp.MustCompile(`.`)
-	cc.Spec.AccessKeyID = m1.ReplaceAllString(cc.Spec.AccessKeyID, "*")
-
 	m2 := regexp.MustCompile(`.*`)
-	cc.Spec.AccessKey = m2.ReplaceAllString(cc.Spec.AccessKey, "Stored in Secret")
+
+	for _, spec := range cc.Spec {
+		spec.AccessKeyID = m1.ReplaceAllString(spec.AccessKeyID, "*")
+		spec.AccessKey = m2.ReplaceAllString(spec.AccessKey, "Stored in Secret")
+	}
 }
 
 func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential, data map[string]string) error {
@@ -328,8 +336,16 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 	var err error
 	log := r.Log
 	log.Info("Create Deployment For " + cc.Name + " owner Start")
-	deployFound := &appsv1.Deployment{}
 
+	var CREDENTIAL_PATH string
+	switch cc.Provider {
+	case "aws", "AWS":
+		CREDENTIAL_PATH = AWS_CREDENTIAL_PATH
+	case "gcp", "GCP":
+		CREDENTIAL_PATH = GCP_CREDENTIAL_PATH
+	}
+
+	deployFound := &appsv1.Deployment{}
 	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential-server", Namespace: cc.Namespace}, deployFound); err != nil && errors.IsNotFound(err) {
 		ccDeployment := &appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
@@ -366,7 +382,7 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 								VolumeMounts: []corev1.VolumeMount{
 									{
 										Name:      "credential",
-										MountPath: AWS_CREDENTIAL_PATH,
+										MountPath: CREDENTIAL_PATH,
 									},
 								},
 							},
