@@ -389,9 +389,12 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 								Resources: corev1.ResourceRequirements{
 									Limits: corev1.ResourceList{
 										"cpu":    resource.MustParse("100m"),
+										"memory": resource.MustParse("30Mi"),
+									},
+									Requests: corev1.ResourceList{
+										"cpu":    resource.MustParse("100m"),
 										"memory": resource.MustParse("20Mi"),
 									},
-									Requests: corev1.ResourceList{},
 								},
 							},
 						},
