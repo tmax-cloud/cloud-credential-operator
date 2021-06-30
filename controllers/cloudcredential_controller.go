@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacApi "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,7 +58,7 @@ const (
 	TMAX_API_GROUP = "credentials.tmax.io"
 
 	AWS_CREDENTIAL_PATH = "/root/.aws"
-	AWS_IMAGE           = "192.168.9.12:5000/cc-light-api-server:v0.0.0" // modify later
+	AWS_IMAGE           = "192.168.9.12:5000/cc-light-api-server:v1.0.0" // modify later
 
 	GCP_CREDENTIAL_PATH = "/root/"        // modify later
 	GCP_IMAGE           = "example-image" // modify later
@@ -384,6 +385,13 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 										Name:      "credential",
 										MountPath: CREDENTIAL_PATH,
 									},
+								},
+								Resources: corev1.ResourceRequirements{
+									Limits: corev1.ResourceList{
+										"cpu":    resource.MustParse("100m"),
+										"memory": resource.MustParse("20Mi"),
+									},
+									Requests: corev1.ResourceList{},
 								},
 							},
 						},
