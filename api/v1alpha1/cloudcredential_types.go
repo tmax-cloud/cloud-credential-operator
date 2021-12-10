@@ -25,9 +25,11 @@ import (
 
 const (
 	CloudCredentialStatusTypeAwaiting = "Awaiting"
-	CloudCredentialStatusTypeCreated  = "Created"
-	CloudCredentialStatusTypeError    = "Error"
-	CloudCredentialStatusTypeDeleted  = "CloudCredential Deleted"
+	CloudCredentialStatusTypeApproved = "Approved"
+	CloudCredentialStatusTypeReject   = "Rejected"
+	//CloudCredentialStatusTypeCreated  = "Created"
+	CloudCredentialStatusTypeError   = "Error"
+	CloudCredentialStatusTypeDeleted = "CloudCredential Deleted"
 )
 
 // CloudCredentialSpec defines the desired state of CloudCredential

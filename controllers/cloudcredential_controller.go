@@ -138,6 +138,8 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	//case credential.CloudCredentialStatusTypeCreated:
 	//case credential.CloudCredentialStatusTypeError:
 	case credential.CloudCredentialStatusTypeAwaiting:
+		fallthrough // 디버깅을 위해 awaiting 상태에서도 생성 시키기 위해...
+	case credential.CloudCredentialStatusTypeApproved:
 		var data map[string]string
 		data = make(map[string]string)
 
@@ -191,7 +193,7 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 			return ctrl.Result{}, err
 		}
 		r.changeToStar(cloudCredential)
-		cloudCredential.Status.Status = credential.CloudCredentialStatusTypeCreated
+		//cloudCredential.Status.Status = credential.CloudCredentialStatusTypeCreated
 		cloudCredential.Status.Reason = "Successfully Created"
 	}
 
