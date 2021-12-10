@@ -8,5 +8,5 @@ roleRef:
   name: proxy-role
 subjects:
 - kind: ServiceAccount
-  name: default
-  namespace: system
+  name: cloud-credential-operator-service-account
+  namespace: hypercloud5-system
