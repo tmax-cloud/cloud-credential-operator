@@ -9,7 +9,6 @@ spec:
   template:
     spec:
       containers:
-      serviceAccountName: cloud-credential-operator-service-account
       - name: kube-rbac-proxy
         image: gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
         args:
@@ -40,3 +39,4 @@ spec:
         secret:
           defaultMode: 420
           secretName: cloud-credential-operator-service-account-token
+      serviceAccountName: cloud-credential-operator-service-account
