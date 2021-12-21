@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: tmaxcloudck/cloud-credential-operator
-  newTag: {imageTag}
+  newTag: b5.0.0.1 #{imageTag}
