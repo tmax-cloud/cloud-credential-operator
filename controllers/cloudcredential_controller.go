@@ -46,7 +46,6 @@ import (
 		- 경량 서버 직접 접근 인가 로직
 	   	- secret 존재할시 덮어쓰기 등 처리
 	   	- secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
-	   	- secret에 대한 권한 Role을 사전생성
 	   	- owner annotation 달아줘야함
 */
 // BUG
@@ -71,6 +70,10 @@ type CloudCredentialReconciler struct {
 	Scheme      *runtime.Scheme
 	patchHelper *patch.Helper
 }
+
+var (
+	cc_labels map[string]string
+)
 
 // +kubebuilder:rbac:groups=credentials.tmax.io,resources=cloudcredentials,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=credentials.tmax.io,resources=cloudcredentials/status,verbs=get;update;patch
@@ -103,6 +106,12 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	log.Info("Resource Name [ " + cloudCredential.Name + " ]")
 	log.Info("Resource Status : " + cloudCredential.Status.Status)
 
+	cc_labels = make(map[string]string)
+	if cloudCredential.Labels != nil {
+		cc_labels = cloudCredential.Labels
+	}
+	cc_labels["fromCloudCredential"] = cloudCredential.Name
+
 	switch cloudCredential.Status.Status {
 	case "":
 		// Set Owner Annotation from Annotation 'Creator'
@@ -120,7 +129,7 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		// Check Duplicated Name
 		duplicated := false
 		for _, cc := range ccList.Items {
-			if cc.Status.Status == credential.CloudCredentialStatusTypeAwaiting && cc.Name == cloudCredential.Name {
+			if cc.Namespace == cloudCredential.Namespace && cc.Name == cloudCredential.Name {
 				duplicated = true
 				break
 			}
@@ -228,6 +237,7 @@ func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential,
 				Name:        cc.Name + "-credential",
 				Namespace:   cc.Namespace,
 				Annotations: cc.Annotations,
+				Labels:      cc_labels,
 			},
 			//Immutable: false,
 			Type:       corev1.SecretTypeOpaque,
@@ -235,12 +245,12 @@ func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential,
 		}
 
 		if err = r.Create(context.TODO(), ccSecret); err != nil && errors.IsNotFound(err) {
-			log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+			log.Info("Secret [ " + cc.Name + "-credential ] Already Exists")
 		} else {
 			log.Info("Successfully create Secret")
 		}
 	} else {
-		log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+		log.Info("Secret [ " + cc.Name + "-credential ] Already Exists")
 	}
 	return err
 }
@@ -256,7 +266,7 @@ func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) e
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cc.Name + "-owner",
 				Namespace:   cc.Namespace,
-				Labels:      cc.Labels,
+				Labels:      cc_labels,
 				Annotations: cc.Annotations,
 			},
 			Rules: []rbacApi.PolicyRule{
@@ -304,7 +314,7 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cc.Name + "-owner",
 				Namespace:   cc.Namespace,
-				Labels:      cc.Labels,
+				Labels:      cc_labels,
 				Annotations: cc.Annotations,
 			},
 			Subjects: []rbacApi.Subject{
@@ -354,7 +364,7 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cc.Name + "-credential-server",
 				Namespace:   cc.Namespace,
-				Labels:      cc.Labels,
+				Labels:      cc_labels,
 				Annotations: cc.Annotations,
 			},
 			Spec: appsv1.DeploymentSpec{
@@ -438,7 +448,7 @@ func (r *CloudCredentialReconciler) createService(cc *credential.CloudCredential
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        cc.Name + "-credential-server-service",
 				Namespace:   cc.Namespace,
-				Labels:      cc.Labels,
+				Labels:      cc_labels,
 				Annotations: cc.Annotations,
 			},
 			Spec: corev1.ServiceSpec{
