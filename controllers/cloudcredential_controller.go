@@ -38,12 +38,9 @@ import (
 
 // TODO
 /*
-		1. 모든 리소스 정상 생성
-		2. API 서버에서 특정 경량 api 서버로 날리는 로직 (함수) 짜기
-		3. 테스트
 	   	- 삭제 로직
 		- validation 웹훅 (아니면 그냥 required 필드로 막던가)
-		- 경량 서버 직접 접근 인가 로직
+		- 경량 서버 직접 접근 인가 로직 (우선순위 나중에...)
 	   	- secret 존재할시 덮어쓰기 등 처리
 	   	- secret - crd 동기화 문제 (삭제됐을 때 어떻게 할지...)(replica?)
 	   	- owner annotation 달아줘야함
@@ -228,7 +225,7 @@ func (r *CloudCredentialReconciler) changeToStar(cc *credential.CloudCredential)
 func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential, data map[string]string) error {
 	var err error
 	log := r.Log
-	log.Info("Create Secret For " + cc.Name + " owner Start")
+	log.Info("Create Secret For " + cc.Name + " Start")
 	secretFound := &corev1.Secret{}
 
 	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential", Namespace: cc.Namespace}, secretFound); err != nil && errors.IsNotFound(err) {
@@ -348,7 +345,7 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredential) error {
 	var err error
 	log := r.Log
-	log.Info("Create Deployment For " + cc.Name + " owner Start")
+	log.Info("Create Deployment For " + cc.Name + " Start")
 
 	var CREDENTIAL_PATH string
 	switch cc.Provider {
@@ -440,7 +437,7 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 func (r *CloudCredentialReconciler) createService(cc *credential.CloudCredential) error {
 	var err error
 	log := r.Log
-	log.Info("Create Service For " + cc.Name + " owner Start")
+	log.Info("Create Service For " + cc.Name + " Start")
 	serviceFound := &corev1.Service{}
 
 	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential-server-service", Namespace: cc.Namespace}, serviceFound); err != nil && errors.IsNotFound(err) {
