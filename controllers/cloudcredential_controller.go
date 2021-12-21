@@ -74,7 +74,9 @@ var (
 
 // +kubebuilder:rbac:groups=credentials.tmax.io,resources=cloudcredentials,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=credentials.tmax.io,resources=cloudcredentials/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;create;delete;patch;update
+// +kubebuilder:rbac:groups=core,resources=secrets;services,verbs=get;list;create;delete;patch;update
+// +kubebuilder:rbac:groups=rbac,resources=roles;rolebindings,verbs=get;list;create;delete;patch;update
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;create;delete;patch;update
 
 func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
@@ -127,7 +129,8 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		// Check Duplicated Name
 		duplicated := false
 		for _, cc := range ccList.Items {
-			if cc.Namespace == cloudCredential.Namespace && cc.Name == cloudCredential.Name {
+			if cc.Namespace == cloudCredential.Namespace && cc.Name == cloudCredential.Name &&
+				cc.CreationTimestamp != cloudCredential.CreationTimestamp {
 				duplicated = true
 				break
 			}
