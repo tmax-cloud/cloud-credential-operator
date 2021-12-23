@@ -30,6 +30,11 @@ spec:
         args:
         - "--metrics-addr=127.0.0.1:8080"
         - "--enable-leader-election"
+        env:
+        - name: AWS_IMAGE_TAG
+          value: "latest"
+        - name: GCP_IMAGE_TAG
+          value: "latest"
         volumeMounts:
         - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
           name: cloud-credential-operator-service-account-token

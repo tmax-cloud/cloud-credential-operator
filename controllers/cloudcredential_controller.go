@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"regexp"
 
 	"github.com/go-logr/logr"
@@ -54,10 +55,10 @@ const (
 	TMAX_API_GROUP = "credentials.tmax.io"
 
 	AWS_CREDENTIAL_PATH = "/root/.aws"
-	AWS_IMAGE           = "192.168.9.12:5000/cc-light-api-server:v1.0.0" // modify later
+	AWS_IMAGE_REPO      = "tmaxcloudck/cloud-credential-api-server"
 
 	GCP_CREDENTIAL_PATH = "/root/"        // modify later
-	GCP_IMAGE           = "example-image" // modify later
+	GCP_IMAGE_REPO      = "example-image" // modify later
 )
 
 // CloudCredentialReconciler reconciles a CloudCredential object
@@ -69,8 +70,22 @@ type CloudCredentialReconciler struct {
 }
 
 var (
-	cc_labels map[string]string
+	cc_labels     map[string]string
+	AWS_IMAGE_TAG string
+	GCP_IMAGE_TAG string
 )
+
+func init() {
+	AWS_IMAGE_TAG = envFrom(AWS_IMAGE_TAG, "5.0.0.0")
+	GCP_IMAGE_TAG = envFrom(GCP_IMAGE_TAG, "5.0.0.0")
+}
+
+func envFrom(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
 
 // +kubebuilder:rbac:groups=credentials.tmax.io,resources=cloudcredentials,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=credentials.tmax.io,resources=cloudcredentials/status,verbs=get;update;patch
@@ -383,7 +398,7 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 						Containers: []corev1.Container{
 							{
 								Name:  "credential-server",
-								Image: AWS_IMAGE,
+								Image: AWS_IMAGE_REPO + ":b" + AWS_IMAGE_TAG,
 								Ports: []corev1.ContainerPort{
 									{
 										Name:          "http",
