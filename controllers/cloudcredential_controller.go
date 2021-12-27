@@ -180,44 +180,15 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		case "gcp", "GCP":
 		}
 
-		if err := r.createSecret(cloudCredential, data); err != nil && !errors.IsNotFound(err) {
-			log.Error(err, "Failed to create Secret")
-			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
-			cloudCredential.Status.Message = err.Error()
-			cloudCredential.Status.Reason = "Failed to create Secret"
-			return ctrl.Result{}, err
-		}
-		if err := r.createRole(cloudCredential); err != nil && !errors.IsNotFound(err) {
-			log.Error(err, "Failed to create Role")
-			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
-			cloudCredential.Status.Message = err.Error()
-			cloudCredential.Status.Reason = "Failed to create Role"
-			return ctrl.Result{}, err
-		}
-		if err := r.createRoleBinding(cloudCredential); err != nil && !errors.IsNotFound(err) {
-			log.Error(err, "Failed to create RoleBinding")
-			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
-			cloudCredential.Status.Message = err.Error()
-			cloudCredential.Status.Reason = "Failed to create RoleBinding"
-			return ctrl.Result{}, err
-		}
-		if err := r.createDeployment(cloudCredential); err != nil && !errors.IsNotFound(err) {
-			log.Error(err, "Failed to create Deployment")
-			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
-			cloudCredential.Status.Message = err.Error()
-			cloudCredential.Status.Reason = "Failed to create Deployment"
-			return ctrl.Result{}, err
-		}
-		if err := r.createService(cloudCredential); err != nil && !errors.IsNotFound(err) {
-			log.Error(err, "Failed to create Service")
-			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
-			cloudCredential.Status.Message = err.Error()
-			cloudCredential.Status.Reason = "Failed to create Service"
+		// secret, role, rolebinding, deployment, service 생성
+		if err := r.createResource(cloudCredential, data); err != nil {
 			return ctrl.Result{}, err
 		}
 		r.changeToStar(cloudCredential)
 		//cloudCredential.Status.Status = credential.CloudCredentialStatusTypeCreated
 		cloudCredential.Status.Reason = "Successfully Created"
+	case credential.CloudCredentialStatusTypeDeleted:
+
 	}
 
 	return ctrl.Result{}, nil
@@ -227,6 +198,47 @@ func (r *CloudCredentialReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&credential.CloudCredential{}).
 		Complete(r)
+}
+
+func (r *CloudCredentialReconciler) createResource(cc *credential.CloudCredential, data map[string]string) error {
+	log := r.Log
+	log.Info("Create Resource For " + cc.Name + " Start")
+	if err := r.createSecret(cc, data); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to create Secret")
+		cc.Status.Status = credential.CloudCredentialStatusTypeError
+		cc.Status.Message = err.Error()
+		cc.Status.Reason = "Failed to create Secret"
+		return err
+	}
+	if err := r.createRole(cc); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to create Role")
+		cc.Status.Status = credential.CloudCredentialStatusTypeError
+		cc.Status.Message = err.Error()
+		cc.Status.Reason = "Failed to create Role"
+		return err
+	}
+	if err := r.createRoleBinding(cc); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to create RoleBinding")
+		cc.Status.Status = credential.CloudCredentialStatusTypeError
+		cc.Status.Message = err.Error()
+		cc.Status.Reason = "Failed to create RoleBinding"
+		return err
+	}
+	if err := r.createDeployment(cc); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to create Deployment")
+		cc.Status.Status = credential.CloudCredentialStatusTypeError
+		cc.Status.Message = err.Error()
+		cc.Status.Reason = "Failed to create Deployment"
+		return err
+	}
+	if err := r.createService(cc); err != nil && !errors.IsNotFound(err) {
+		log.Error(err, "Failed to create Service")
+		cc.Status.Status = credential.CloudCredentialStatusTypeError
+		cc.Status.Message = err.Error()
+		cc.Status.Reason = "Failed to create Service"
+		return err
+	}
+	return nil
 }
 
 func (r *CloudCredentialReconciler) changeToStar(cc *credential.CloudCredential) {
@@ -242,7 +254,7 @@ func (r *CloudCredentialReconciler) changeToStar(cc *credential.CloudCredential)
 func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential, data map[string]string) error {
 	var err error
 	log := r.Log
-	log.Info("Create Secret For " + cc.Name + " Start")
+	log.Info("Create Secret [ " + cc.Name + "-credential ] Start")
 	secretFound := &corev1.Secret{}
 
 	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential", Namespace: cc.Namespace}, secretFound); err != nil && errors.IsNotFound(err) {
@@ -272,7 +284,7 @@ func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential,
 func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) error {
 	var err error
 	log := r.Log
-	log.Info("Create Role For " + cc.Name + " owner Start")
+	log.Info("Create Role [ " + cc.Name + "-owner ] Start")
 	roleFound := &rbacApi.Role{}
 
 	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-owner", Namespace: cc.Namespace}, roleFound); err != nil && errors.IsNotFound(err) {
@@ -305,14 +317,14 @@ func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) e
 		}
 
 		if err = r.Create(context.TODO(), ccRole); err != nil && errors.IsNotFound(err) {
-			log.Info("Role for CloudCredential [ " + cc.Name + " ] Already Exists")
+			log.Info("Role [ " + cc.Name + "-owner ] Already Exists")
 		} else if err != nil {
-			log.Error(err, "Failed to create Role")
+			log.Error(err, "Failed to create Role [ "+cc.Name+"-owner ]")
 		} else {
-			log.Info("Create Role [ " + cc.Name + "-owner ] Success")
+			log.Info("Role [ " + cc.Name + "-owner ] Success")
 		}
 	} else {
-		log.Info("Role for CloudCredential [ " + cc.Name + " ] Already Exists")
+		log.Info("Role [ " + cc.Name + "-owner ] Already Exists")
 	}
 	return err
 }
@@ -320,7 +332,7 @@ func (r *CloudCredentialReconciler) createRole(cc *credential.CloudCredential) e
 func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCredential) error {
 	var err error
 	log := r.Log
-	log.Info("Create Rolebinding For " + cc.Name + " owner Start")
+	log.Info("Create Rolebinding [ " + cc.Name + "-owner ] Start")
 	rbFound := &rbacApi.RoleBinding{}
 
 	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-owner", Namespace: cc.Namespace}, rbFound); err != nil && errors.IsNotFound(err) {
@@ -346,7 +358,7 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 		}
 
 		if err = r.Create(context.TODO(), ccRoleBinding); err != nil && errors.IsNotFound(err) {
-			log.Info("RoleBinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+			log.Info("RoleBinding [ " + cc.Name + "-owner ] Already Exists")
 		} else if err != nil {
 			log.Error(err, "Failed to create Rolebinding")
 		} else {
@@ -354,7 +366,7 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 		}
 
 	} else {
-		log.Info("Rolebinding for CloudCredential [ " + cc.Name + " ] Already Exists")
+		log.Info("Rolebinding [ " + cc.Name + "-owner ] Already Exists")
 	}
 	return err
 }
@@ -362,7 +374,7 @@ func (r *CloudCredentialReconciler) createRoleBinding(cc *credential.CloudCreden
 func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredential) error {
 	var err error
 	log := r.Log
-	log.Info("Create Deployment For " + cc.Name + " Start")
+	log.Info("Create Deployment [ " + cc.Name + "-credential-server ] Start")
 
 	var CREDENTIAL_PATH string
 	switch cc.Provider {
@@ -440,13 +452,13 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 		}
 
 		if err = r.Create(context.TODO(), ccDeployment); err != nil && errors.IsNotFound(err) {
-			log.Info("Deployment for CloudCredential [ " + cc.Name + " ] Already Exists")
+			log.Info("Deployment [ " + cc.Name + "-credential-server ] Already Exists")
 		} else {
 			log.Info("Create Deployment [ " + cc.Name + "-credential-server ] Success")
 		}
 
 	} else {
-		log.Info("Deployment for CloudCredential [ " + cc.Name + " ] Already Exists")
+		log.Info("Deployment [ " + cc.Name + "-credential-server ] Already Exists")
 	}
 	return err
 }
@@ -454,7 +466,7 @@ func (r *CloudCredentialReconciler) createDeployment(cc *credential.CloudCredent
 func (r *CloudCredentialReconciler) createService(cc *credential.CloudCredential) error {
 	var err error
 	log := r.Log
-	log.Info("Create Service For " + cc.Name + " Start")
+	log.Info("Create Service [ " + cc.Name + "-credential-server-service ] Start")
 	serviceFound := &corev1.Service{}
 
 	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential-server-service", Namespace: cc.Namespace}, serviceFound); err != nil && errors.IsNotFound(err) {
@@ -479,12 +491,12 @@ func (r *CloudCredentialReconciler) createService(cc *credential.CloudCredential
 			},
 		}
 		if err = r.Create(context.TODO(), ccService); err != nil && errors.IsNotFound(err) {
-			log.Info("Service for CloudCredential [ " + cc.Name + " ] Already Exists")
+			log.Info("Service [ " + cc.Name + "-credential-server-service ] Already Exists")
 		} else {
 			log.Info("Create Service [ " + cc.Name + "-credential-server-service ] Success")
 		}
 	} else {
-		log.Info("Service for CloudCredential [ " + cc.Name + " ] Already Exists")
+		log.Info("Service [ " + cc.Name + "-credential-server-service ] Already Exists")
 	}
 	return err
 }
