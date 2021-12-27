@@ -182,6 +182,8 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 
 		// secret, role, rolebinding, deployment, service 생성
 		if err := r.createResource(cloudCredential, data); err != nil {
+			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
+			cloudCredential.Status.Message = err.Error()
 			return ctrl.Result{}, err
 		}
 		r.changeToStar(cloudCredential)
@@ -205,36 +207,26 @@ func (r *CloudCredentialReconciler) createResource(cc *credential.CloudCredentia
 	log.Info("Create Resource For " + cc.Name + " Start")
 	if err := r.createSecret(cc, data); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to create Secret")
-		cc.Status.Status = credential.CloudCredentialStatusTypeError
-		cc.Status.Message = err.Error()
 		cc.Status.Reason = "Failed to create Secret"
 		return err
 	}
 	if err := r.createRole(cc); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to create Role")
-		cc.Status.Status = credential.CloudCredentialStatusTypeError
-		cc.Status.Message = err.Error()
 		cc.Status.Reason = "Failed to create Role"
 		return err
 	}
 	if err := r.createRoleBinding(cc); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to create RoleBinding")
-		cc.Status.Status = credential.CloudCredentialStatusTypeError
-		cc.Status.Message = err.Error()
 		cc.Status.Reason = "Failed to create RoleBinding"
 		return err
 	}
 	if err := r.createDeployment(cc); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to create Deployment")
-		cc.Status.Status = credential.CloudCredentialStatusTypeError
-		cc.Status.Message = err.Error()
 		cc.Status.Reason = "Failed to create Deployment"
 		return err
 	}
 	if err := r.createService(cc); err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to create Service")
-		cc.Status.Status = credential.CloudCredentialStatusTypeError
-		cc.Status.Message = err.Error()
 		cc.Status.Reason = "Failed to create Service"
 		return err
 	}
