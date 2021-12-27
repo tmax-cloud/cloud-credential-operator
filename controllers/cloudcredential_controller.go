@@ -190,9 +190,14 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		//cloudCredential.Status.Status = credential.CloudCredentialStatusTypeCreated
 		cloudCredential.Status.Reason = "Successfully Created"
 	case credential.CloudCredentialStatusTypeDeleted:
-
+		if err := r.deleteResource(cloudCredential); err != nil {
+			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
+			cloudCredential.Status.Message = err.Error()
+			return ctrl.Result{}, err
+		} else {
+			cloudCredential.Status.Reason = "Successfully Deleted"
+		}
 	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -233,6 +238,88 @@ func (r *CloudCredentialReconciler) createResource(cc *credential.CloudCredentia
 	return nil
 }
 
+func (r *CloudCredentialReconciler) deleteResource(cc *credential.CloudCredential) error {
+	var err, reason error
+	log := r.Log
+	log.Info("Delete Resource For " + cc.Name + " Start")
+	serviceFound := &corev1.Service{}
+	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential-server-service", Namespace: cc.Namespace}, serviceFound); err != nil && errors.IsNotFound(err) {
+		log.Info("Service  [ " + cc.Name + "-credential-server-service ] Not Exists")
+	} else if err != nil {
+		log.Error(err, "Failed to get Service [ "+cc.Name+"-credential-server-service ]")
+		reason = err
+	} else {
+		if err = r.Delete(context.TODO(), serviceFound); err != nil {
+			log.Error(err, "Failed to delete Service [ "+cc.Name+"-credential-server-service ]")
+			reason = err
+		} else {
+			log.Info("Delete Service  [ " + cc.Name + "-credential-server-service ] Success")
+		}
+	}
+
+	deployFound := &appsv1.Deployment{}
+	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential-server", Namespace: cc.Namespace}, deployFound); err != nil && errors.IsNotFound(err) {
+		log.Info("Deployment  [ " + cc.Name + "-credential-server ] Not Exists")
+	} else if err != nil {
+		log.Error(err, "Failed to get Deployment [ "+cc.Name+"-credential-server ]")
+		reason = err
+	} else {
+		if err = r.Delete(context.TODO(), deployFound); err != nil {
+			log.Error(err, "Failed to delete Deployment [ "+cc.Name+"-credential-server ]")
+			reason = err
+		} else {
+			log.Info("Delete Deployment  [ " + cc.Name + "-credential-server ] Success")
+		}
+	}
+
+	rbFound := &rbacApi.RoleBinding{}
+	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-owner", Namespace: cc.Namespace}, rbFound); err != nil && errors.IsNotFound(err) {
+		log.Info("RoleBinding  [ " + cc.Name + "-owner ] Not Exists")
+	} else if err != nil {
+		log.Error(err, "Failed to get RoleBinding [ "+cc.Name+"-owner ]")
+		reason = err
+	} else {
+		if err = r.Delete(context.TODO(), rbFound); err != nil {
+			log.Error(err, "Failed to delete RoleBinding [ "+cc.Name+"-owner ]")
+			reason = err
+		} else {
+			log.Info("Delete RoleBinding  [ " + cc.Name + "-owner ] Success")
+		}
+	}
+
+	roleFound := &rbacApi.Role{}
+	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-owner", Namespace: cc.Namespace}, roleFound); err != nil && errors.IsNotFound(err) {
+		log.Info("Role  [ " + cc.Name + "-owner ] Not Exists")
+	} else if err != nil {
+		log.Error(err, "Failed to get Role [ "+cc.Name+"-owner ]")
+		reason = err
+	} else {
+		if err = r.Delete(context.TODO(), roleFound); err != nil {
+			log.Error(err, "Failed to delete Role [ "+cc.Name+"-owner ]")
+			reason = err
+		} else {
+			log.Info("Delete Role  [ " + cc.Name + "-owner ] Success")
+		}
+	}
+
+	secretFound := &corev1.Secret{}
+	if err = r.Get(context.TODO(), types.NamespacedName{Name: cc.Name + "-credential", Namespace: cc.Namespace}, secretFound); err != nil && errors.IsNotFound(err) {
+		log.Info("Secret  [ " + cc.Name + "-credential ] Not Exists")
+	} else if err != nil {
+		log.Error(err, "Failed to get Secret [ "+cc.Name+"-credential ]")
+		reason = err
+	} else {
+		if err = r.Delete(context.TODO(), secretFound); err != nil {
+			log.Error(err, "Failed to delete Secret [ "+cc.Name+"-credential ]")
+			reason = err
+		} else {
+			log.Info("Delete Secret  [ " + cc.Name + "-credential ] Success")
+		}
+	}
+
+	return reason
+}
+
 func (r *CloudCredentialReconciler) changeToStar(cc *credential.CloudCredential) {
 	m1 := regexp.MustCompile(`.`)
 	m2 := regexp.MustCompile(`.*`)
@@ -265,7 +352,7 @@ func (r *CloudCredentialReconciler) createSecret(cc *credential.CloudCredential,
 		if err = r.Create(context.TODO(), ccSecret); err != nil && errors.IsNotFound(err) {
 			log.Info("Secret [ " + cc.Name + "-credential ] Already Exists")
 		} else {
-			log.Info("Successfully create Secret")
+			log.Info("Create Secret [ " + cc.Name + "-credential ] Success")
 		}
 	} else {
 		log.Info("Secret [ " + cc.Name + "-credential ] Already Exists")

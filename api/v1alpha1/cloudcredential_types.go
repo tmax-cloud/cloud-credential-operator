@@ -29,7 +29,7 @@ const (
 	CloudCredentialStatusTypeReject   = "Rejected"
 	//CloudCredentialStatusTypeCreated  = "Created"
 	CloudCredentialStatusTypeError   = "Error"
-	CloudCredentialStatusTypeDeleted = "CloudCredential Deleted"
+	CloudCredentialStatusTypeDeleted = "Deleted"
 )
 
 // CloudCredentialSpec defines the desired state of CloudCredential
@@ -48,7 +48,7 @@ type CloudCredentialStatus struct {
 	Reason string `json:"reason,omitempty" protobuf:"bytes,3,opt,name=reason"`
 	// LastTransitionTime shows the time when the status changed in last
 	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty" protobuf:"bytes,3,opt,name=lastTransitionTime"`
-	// +kubebuilder:validation:Enum=Awaiting;Created;Error;CloudCredential Deleted;
+	// +kubebuilder:validation:Enum=Awaiting;Approved;Rejected;Error;Deleted;
 	// Status shows the present status of the CloudCredential
 	Status string `json:"status,omitempty" protobuf:"bytes,4,opt,name=status"`
 }
