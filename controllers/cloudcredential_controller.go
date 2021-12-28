@@ -119,12 +119,6 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	log.Info("Resource Name [ " + cloudCredential.Name + " ]")
 	log.Info("Resource Status : " + cloudCredential.Status.Status)
 
-	cc_labels = make(map[string]string)
-	if cloudCredential.Labels != nil {
-		cc_labels = cloudCredential.Labels
-	}
-	cc_labels["fromCloudCredential"] = cloudCredential.Name
-
 	switch cloudCredential.Status.Status {
 	case "":
 		// Set Owner Annotation from Annotation 'Creator'
@@ -165,6 +159,11 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	case credential.CloudCredentialStatusTypeApproved:
 		var data map[string]string
 		data = make(map[string]string)
+		cc_labels = make(map[string]string)
+		if cloudCredential.Labels != nil {
+			cc_labels = cloudCredential.Labels
+		}
+		cc_labels["fromCloudCredential"] = cloudCredential.Name
 
 		switch cloudCredential.Provider {
 		case "aws", "AWS":
@@ -187,16 +186,14 @@ func (r *CloudCredentialReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 			return ctrl.Result{}, err
 		}
 		r.changeToStar(cloudCredential)
-		//cloudCredential.Status.Status = credential.CloudCredentialStatusTypeCreated
 		cloudCredential.Status.Reason = "Successfully Created"
 	case credential.CloudCredentialStatusTypeDeleted:
 		if err := r.deleteResource(cloudCredential); err != nil {
 			cloudCredential.Status.Status = credential.CloudCredentialStatusTypeError
 			cloudCredential.Status.Message = err.Error()
 			return ctrl.Result{}, err
-		} else {
-			cloudCredential.Status.Reason = "Successfully Deleted"
 		}
+		cloudCredential.Status.Reason = "All Resources Deleted"
 	}
 	return ctrl.Result{}, nil
 }

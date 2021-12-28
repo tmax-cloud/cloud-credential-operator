@@ -27,9 +27,8 @@ const (
 	CloudCredentialStatusTypeAwaiting = "Awaiting"
 	CloudCredentialStatusTypeApproved = "Approved"
 	CloudCredentialStatusTypeReject   = "Rejected"
-	//CloudCredentialStatusTypeCreated  = "Created"
-	CloudCredentialStatusTypeError   = "Error"
-	CloudCredentialStatusTypeDeleted = "Deleted"
+	CloudCredentialStatusTypeError    = "Error"
+	CloudCredentialStatusTypeDeleted  = "Deleted"
 )
 
 // CloudCredentialSpec defines the desired state of CloudCredential
