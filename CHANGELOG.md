@@ -1,6 +1,22 @@
 # HyperCloud-Cloud-Credential-Operator changelog!!
 All notable changes to this project will be documented in this file.
 
+<!-------------------- v5.0.0.9 start -------------------->
+
+## HyperCloud-Cloud-Credential-Operator_5.0.0.9 (2022. 07. 21. (목) 12:36:47 KST)
+
+### Added
+
+### Changed
+
+### Fixed
+
+### CRD yaml
+
+### Etc
+
+<!--------------------- v5.0.0.9 end --------------------->
+
 <!-------------------- v5.0.0.8 start -------------------->
 
 ## HyperCloud-Cloud-Credential-Operator_5.0.0.8 (2022. 04. 15. (금) 13:01:39 KST)
